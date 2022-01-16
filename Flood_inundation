@@ -1,0 +1,76 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var roi_bhavnagar = 
+    /* color: #ffc82d */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[72.06627988635786, 21.814174892913996],
+          [72.06627988635786, 21.68981288492832],
+          [72.25442075549849, 21.68981288492832],
+          [72.25442075549849, 21.814174892913996]]], null, false),
+    roi_surat = 
+    /* color: #bf04c2 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[72.68593128034871, 21.30788535920783],
+          [72.68593128034871, 21.065877600032756],
+          [73.01140125105184, 21.065877600032756],
+          [73.01140125105184, 21.30788535920783]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Load Sentinel-1 C-Band SAR (Log Scale, VV Polarization, Descending Orbit) 
+
+// Load Sentinel-1 C-Band SAR (Log Scale, VV Polarization, Descending Orbit) 
+var collectionVV = ee.ImageCollection('COPERNICUS/S1_GRD')
+  .filter(ee.Filter.eq('instrumentMode', 'IW'))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+  .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))
+  .filterMetadata('resolution_meters','equals', 10)
+  .filterBounds(roi_bhavnagar)
+  .select('VV');
+print(collectionVV, 'Collection VV');
+
+// Load Sentinel-1 C-Band SAR (Log Scale, VH Polarization,  Descending Orbit) 
+var collectionVH = ee.ImageCollection('COPERNICUS/S1_GRD')
+  .filter(ee.Filter.eq('instrumentMode', 'IW'))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
+  .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))
+  .filterMetadata('resolution_meters','equals', 10)
+  .filterBounds(roi_bhavnagar)
+  .select('VH');
+print(collectionVH, 'Collection VH');
+
+
+//Filter by date 
+var beforeVV = collectionVV.filterDate('2021-05-01', '2021-05-15').mosaic();
+var afterVV = collectionVV.filterDate('2021-05-19', '2021-05-25').mosaic();
+var beforeVH = collectionVH.filterDate('2021-05-01', '2021-05-15').mosaic();
+var afterVH = collectionVH.filterDate('2021-05-19', '2021-05-25').mosaic();
+
+print(beforeVH);
+print(afterVH);
+
+//Display map 
+Map.centerObject(roi_bhavnagar,7);
+Map.addLayer(beforeVV, {min:-15,max:0},'Before Flood VV',0);
+Map.addLayer(afterVV, {min:-15,max:0},'After Flood VV',0);
+Map.addLayer(beforeVH, {min:-25,max:0},'Before Flood VH',0);
+Map.addLayer(afterVH, {min:-25,max:0},'After Flood VH',0);
+  
+Map.addLayer(beforeVH.addBands(afterVH).addBands(beforeVH), {min:-25,max:-8},'BVH/AVV/AVH composite', 0);
+
+var differenceVH = afterVH.divide(beforeVH);
+Map.addLayer(differenceVH, {min:0.1, max:2}, 'Difference VH', 0);
+var diff_upper_threshold = 1.5;
+var diffVH_thresholded = differenceVH.gt(diff_upper_threshold);
+Map.addLayer(diffVH_thresholded.updateMask(diffVH_thresholded), {palette:'#0000FF'}, 'flooded_areas - blue', 1 );
+
+Export.map.toCloudStorage({image:beforeVH, description:'Export before map of Bhavnagar', fileFormat:'jpg', region:roi_bhavnagar});
